@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project-private xmlns="http://www.netbeans.org/ns/project-private/1">
+    <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
+    <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
+        <group>
+            <file>file:/home/cpu10777-local/SourceCode/HttpJava/ZHTTPServer/src/http/api/path/ZPathAPI.java</file>
+            <file>file:/home/cpu10777-local/SourceCode/HttpJava/ZHTTPServer/src/http/api/handler/MethodHandlerFactory.java</file>
+            <file>file:/home/cpu10777-local/SourceCode/HttpJava/ZHTTPServer/src/http/api/handler/JSMessage.java</file>
+            <file>file:/home/cpu10777-local/SourceCode/HttpJava/ZHTTPServer/src/http/api/handler/ZAPIMsgHandler.java</file>
+            <file>file:/home/cpu10777-local/SourceCode/HttpJava/ZHTTPServer/src/http/api/servlet/ZPApiServlet.java</file>
+            <file>file:/home/cpu10777-local/SourceCode/HttpJava/ZHTTPServer/src/http/api/servlet/BaseApiController.java</file>
+        </group>
+    </open-files>
+</project-private>
