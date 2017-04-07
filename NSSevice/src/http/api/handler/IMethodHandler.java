@@ -11,5 +11,4 @@ public interface IMethodHandler {
 
     String getContentType();
     
-    String handleResult(short resultCode, short responseCode, String message);
 }

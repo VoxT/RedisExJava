@@ -55,12 +55,6 @@ public class APIDemo {
     }
     
     public static void main(String[] args) throws InterruptedException, Exception {
-//        JSMessageExample js = new JSMessageExample();
-//        js.version = "1.0.1";
-//        js.data = "data";
-//        js.number = 2;
-//        js.signature = "sig";
-//        String strJSON = ObjectToString(js);
         Random random = new Random();
         int uReqFeq = 1;
         

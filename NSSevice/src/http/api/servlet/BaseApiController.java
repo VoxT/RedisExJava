@@ -1,5 +1,6 @@
 package http.api.servlet;
 
+import http.api.define.ZAPIDefine;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,7 +51,9 @@ public class BaseApiController {
         
         logger.info("Accept connection from addr=" + req.getRemoteHost() + " uri=" + req.getRequestURI());
         if (pathAPI.size() < 2) {
-            return ("Wrong api: uri=" + req.getRequestURI());
+            return CommonUtils.handleResult(ZAPIDefine.API_RESULT_FAIL, 
+                                            ZAPIDefine.API_RES_WRONG_API, 
+                                            "Wrong api: uri=" + req.getRequestURI());
         }
         
         //String methodName = params.get(1);
@@ -58,7 +61,9 @@ public class BaseApiController {
         
         IMethodHandler handler = MethodHandlerFactory.getMethodHandler(pathAPI);
         if (handler == null) {
-            return "{result:0,code:404,msg:\"Not match api\"}";
+            return CommonUtils.handleResult(ZAPIDefine.API_RESULT_FAIL, 
+                                            ZAPIDefine.API_RES_WRONG_API, 
+                                            "Not match api: uri=" + req.getRequestURI());
         }
         resp.setContentType(handler.getContentType());
         

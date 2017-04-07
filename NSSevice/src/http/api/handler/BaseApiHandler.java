@@ -15,11 +15,4 @@ public abstract class BaseApiHandler implements IMethodHandler {
         return HEADER_JSON;
     }
     
-    @Override
-    public String handleResult(short resultCode, short responseCode, String message)
-    {
-        return ("{\"result\":" + Short.toString(resultCode)
-                + ",\"code\":" + Short.toString(responseCode)
-                + ",\"msg\":\"" + message + "\"}");
-    }
 }

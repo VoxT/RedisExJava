@@ -18,7 +18,7 @@ public class ZAPIDefine {
     public static final short API_RES_WRONG_METHOD                = 401;
     public static final short API_RES_SAVE_MSG_FAIL               = 402;
     public static final short API_RES_WRONG_API                   = 404;
-    public static final short API_INVALID_SIGNATURE               = 403;
+    public static final short API_INVALID_ID                      = 403;
     public static final short API_RES_PARSE_FAIL                  = 405;
     public static final short API_RES_MISS_DATA                   = 406;
     public static final short API_RES_REQ_SIZE_TOO_BIG            = 407;
