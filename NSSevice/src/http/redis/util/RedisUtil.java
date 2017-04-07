@@ -195,6 +195,21 @@ public class RedisUtil {
         return true;
     }
     
+    public static Long getLongvalue(String key)
+    {
+        if (!isValidString(key))
+            return null;
+        
+        try
+        {
+            return tryParseLong(getRdsStringCmdIns().get(key));
+        }
+        catch (Exception ex)
+        {
+            return null;
+        }
+    }
+    
     /**
      * 
      * @param key
