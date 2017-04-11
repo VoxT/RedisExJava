@@ -333,7 +333,7 @@ public class CommonUtils {
             httpPost.setEntity(new UrlEncodedFormEntity(nvps, "UTF-8"));
             try (CloseableHttpResponse response = httpclient.execute(httpPost)) {
                 HttpEntity entity = response.getEntity();
-                InputStream inputStream = entity.getContent();;
+                InputStream inputStream = entity.getContent();
                 String resp = IOUtils.toString(inputStream, "UTF-8");
                 return resp;
             }

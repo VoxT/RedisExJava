@@ -15,6 +15,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
@@ -140,7 +141,7 @@ public class ZAPIMsgHandler extends BaseApiHandler {
         
         if (RedisUtil.zAdd(getKeyListMsgByUserID(jsMsg.userId), reqTime, Long.toUnsignedString(msgId)) == null)
             return false;
-        if (RedisUtil.zAdd(getKeyListMsgBySenderID(jsMsg.userId), sendTime, Long.toUnsignedString(msgId)) == null)
+        if (RedisUtil.zAdd(getKeyListMsgBySenderID(jsMsg.senderId), sendTime, Long.toUnsignedString(msgId)) == null)
             return false;
         
         // request counter
@@ -154,19 +155,19 @@ public class ZAPIMsgHandler extends BaseApiHandler {
         return true;
     }
     
-    private String getMsgKey(Long msgId)
+    private String getMsgKey(long msgId)
     {
         String strMsgId = Long.toUnsignedString(msgId);
         return ("ns:msg:" + strMsgId + ":info");
     }
 
-    private String getKeyListMsgByUserID(Long userId)
+    private String getKeyListMsgByUserID(long userId)
     {
         String strUserId = Long.toUnsignedString(userId);
         return ("ns:msg_list_of_user:" + strUserId);
     }
 
-    private String getKeyListMsgBySenderID(Long senderId)
+    private String getKeyListMsgBySenderID(long senderId)
     {
         String strSenderId = Long.toUnsignedString(senderId);
         return ("ns:msg_list_of_sender:" + strSenderId);
@@ -289,5 +290,81 @@ public class ZAPIMsgHandler extends BaseApiHandler {
         return RedisUtil.getLongvalue(RDS_NS_PROCESSED_TIME_AVERAGE);
     }
     
+    public Set<Long> getListUser()
+    {
+        return RedisUtil.sMembersLongValue(RDS_NS_USERS);
+    }
     
+    public Set<Long> getListSender()
+    {
+        return RedisUtil.sMembersLongValue(RDS_NS_SENDERS);
+    }
+    
+    public List<Long> getListMsgByUser(long userId)
+    {
+        if (userId <= 0)
+            return null;
+        
+        return RedisUtil.zRangeLongValue(getKeyListMsgByUserID(userId), 0, -1);
+    }
+    
+    public List<Long> getListMsgBySender(long senderId)
+    {
+        if (senderId <= 0)
+            return null;
+        
+        return RedisUtil.zRangeLongValue(getKeyListMsgBySenderID(senderId), 0, -1);
+    }
+    
+    public Set<Long> getListSenderByUser(long userId)
+    {
+        if (userId <= 0)
+            return null;
+        
+        List<Long> msgList = getListMsgByUser(userId);
+        if (msgList == null)
+            return null;
+        
+        Set<Long> users = new HashSet<>();
+        Long uId;
+        for (Long msgId : msgList) 
+        {
+            if (msgId == null)
+                continue;
+            
+            uId = RedisUtil.hGetLongValue(getMsgKey(msgId), RDS_NS_MSG_INFO_FIELD_SENDER_ID);
+            if (uId == null)
+                continue;
+            
+            users.add(uId);
+        }
+        
+        return users;
+    }
+    
+    public Set<Long> getListUserBySender(long senderId)
+    {
+        if (senderId <= 0)
+            return null;
+        
+        List<Long> msgList = getListMsgBySender(senderId);
+        if (msgList == null)
+            return null;
+        
+        Set<Long> senders = new HashSet<>();
+        Long sId;
+        for (Long msgId : msgList) 
+        {
+            if (msgId == null)
+                continue;
+            
+            sId = RedisUtil.hGetLongValue(getMsgKey(msgId), RDS_NS_MSG_INFO_FIELD_USER_ID);
+            if (sId == null)
+                continue;
+            
+            senders.add(sId);
+        }
+        
+        return senders;
+    }
 }

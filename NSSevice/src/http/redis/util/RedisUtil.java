@@ -88,20 +88,18 @@ public class RedisUtil {
     /**
      * 
      * @param strValue
-     * @return true if key is valid,
-     *         false if key is invalid.
+     * @return true if string is valid,
+     *         false if string is invalid.
      */
     private static boolean isValidString(String... strValue)
     {
         if (strValue == null)
             return false;
         for (String str : strValue) {
-            if (str == null) {
+            if (str == null)
                 return false;
-            }
-            if (str.isEmpty()) {
+            if (str.isEmpty())
                 return false;
-            }
         }
         
         return true;
@@ -387,7 +385,7 @@ public class RedisUtil {
         {
             Set<String> stringMembers = getRdsStringCmdIns().smembers(key);
             Set<Long> longMembers = new HashSet<>();
-            Long value = null;
+            Long value;
             for (String member : stringMembers)
             {
                 value = tryParseLong(member);
@@ -515,7 +513,7 @@ public class RedisUtil {
         {
             List<String> stringMembers = getRdsStringCmdIns().zrange(key, start, stop);
             List<Long> longMembers = new ArrayList<>();
-            Long value = null;
+            Long value;
             for (String member : stringMembers)
             {
                 value = tryParseLong(member);

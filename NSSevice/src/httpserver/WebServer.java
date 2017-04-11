@@ -1,5 +1,6 @@
 package httpserver;
 
+import http.api.handler.ZAPIMsgHandler;
 import javax.servlet.Filter;
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.server.Connector;
@@ -67,6 +68,14 @@ public class WebServer extends Thread {
         ShutdownThread obj = new ShutdownThread(server);
         Runtime.getRuntime().addShutdownHook(obj);
         server.start();
+        
+        System.out.println(ZAPIMsgHandler.getInstance().getTotalRequest());
+        System.out.println(ZAPIMsgHandler.getInstance().getAverageProcessedTime());
+        System.out.println(ZAPIMsgHandler.getInstance().getListUser());
+        System.out.println(ZAPIMsgHandler.getInstance().getListSender());
+        System.out.println(ZAPIMsgHandler.getInstance().getListSenderByUser(17));
+        System.out.println(ZAPIMsgHandler.getInstance().getListUserBySender(107L));
+        
         server.join();
         
     }
