@@ -12,12 +12,5 @@ package http.api.define;
 public class JSMessage {
     public Long userId;
     public Long senderId;
-    public String data;
-
-    public JSMessage(Long userId, Long senderId, String data) {
-        this.userId = userId;
-        this.senderId = senderId;
-        this.data = data;
-    }
-        
+    public String data;  
 }

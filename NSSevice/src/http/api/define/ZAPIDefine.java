@@ -33,5 +33,5 @@ public class ZAPIDefine {
     public static final String API_PATH                           = "api";
     public static final String API_PATH_MSG                       = "msg";
 
-    public static final short MAX_REQ_BUFFER_SIZE                 = 10240;
+    public static final int MAX_REQ_BUFFER_SIZE                   = 10240;
 }
