@@ -58,7 +58,7 @@ public class APIDemo {
         Random random = new Random();
         int uReqFeq = 1;
         
-        while (uReqFeq < 200)
+        while (uReqFeq < 101)
         {
             String strJSON = ObjectToString(new JSMessage((long) random.nextInt(10) + 1,
                               (long) random.nextInt(10) + 11, "msg_" + Integer.toString(uReqFeq)));

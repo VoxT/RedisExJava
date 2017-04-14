@@ -96,9 +96,7 @@ public class RedisUtil {
         if (strValue == null)
             return false;
         for (String str : strValue) {
-            if (str == null)
-                return false;
-            if (str.isEmpty())
+            if ((str == null) || str.isEmpty())
                 return false;
         }
         
