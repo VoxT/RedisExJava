@@ -13,6 +13,7 @@ import http.redis.util.RedisUtil;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
@@ -50,28 +51,15 @@ public class ZAPIMsgHandler extends BaseApiHandler {
                                                 ZAPIDefine.API_RES_WRONG_METHOD, 
                                                 "Wrong method. Must be POST");
             
-            int contentLength = req.getContentLength();
-            if (contentLength > ZAPIDefine.MAX_REQ_BUFFER_SIZE)
-                return CommonUtils.handleResult(ZAPIDefine.API_RESULT_FAIL, 
-                                                ZAPIDefine.API_RES_REQ_SIZE_TOO_BIG, 
-                                                "Request size too big");
-            
-            // Read request data
-            InputStream inStream = req.getInputStream();
+            InputStream is = req.getInputStream();
             ByteArrayOutputStream baOutStream = new ByteArrayOutputStream();
 
-            byte[] recvBuf = new byte[ZAPIDefine.MAX_REQ_BUFFER_SIZE];
-            int readBytes = 0, countBytes = 0;
+            byte buf[] = new byte[ZAPIDefine.MAX_REQ_BUFFER_SIZE];
+            int readSize = 0;
 
-            while (countBytes < contentLength) {
-                readBytes = inStream.read(recvBuf);
-                baOutStream.write(recvBuf, 0, readBytes);
-                countBytes += readBytes;
+            while ((readSize = is.read(buf)) > 0) {
+                baOutStream.write(buf, 0, readSize);
             }
-            if (countBytes != contentLength)
-                return CommonUtils.handleResult(ZAPIDefine.API_RESULT_FAIL, 
-                                                ZAPIDefine.API_RES_READ_REQ_FAILED, 
-                                                "Read request failed");
 
             // parse json
             String jsonString = new String(baOutStream.toByteArray(), Charset.forName("UTF-8"));
@@ -83,8 +71,7 @@ public class ZAPIMsgHandler extends BaseApiHandler {
             if (!validateLongValue(jsMsg.userId, jsMsg.senderId))
                 return CommonUtils.handleResult(ZAPIDefine.API_RESULT_FAIL, 
                                                 ZAPIDefine.API_INVALID_ID, 
-                                                "Invalid id uId=" + Long.toString(jsMsg.userId) 
-                                                + " sId=" + Long.toString(jsMsg.senderId));
+                                                "Invalid id");
             
             //do someting
             System.out.println("sid=" + jsMsg.senderId + " uid=" + jsMsg.userId 
@@ -129,7 +116,7 @@ public class ZAPIMsgHandler extends BaseApiHandler {
         if (jsMsg == null)
             return false;
         
-        return ((System.currentTimeMillis()%2) == 1);
+        return ((System.currentTimeMillis() % 2) == 1);
     }
     
     private boolean saveInfo(JSMessage jsMsg, long reqTime, long sendTime, boolean result)
@@ -148,7 +135,7 @@ public class ZAPIMsgHandler extends BaseApiHandler {
         String listMsgIdKey = getKeyListMsgOfSIdAndUId(jsMsg.userId, jsMsg.senderId);
         if (listMsgIdKey == null)
             return false;
-        if (RedisUtil.zAdd(listMsgIdKey, reqTime, Long.toUnsignedString(msgId)) == null)
+        if (RedisUtil.zAdd(listMsgIdKey, 1, Long.toUnsignedString(msgId)) == null)
             return false;
         
         // SET users by senderid
@@ -159,10 +146,10 @@ public class ZAPIMsgHandler extends BaseApiHandler {
             return false;
                 
         // ZSET users
-        if (RedisUtil.zAdd(RDS_NS_USERS, jsMsg.userId, Long.toUnsignedString(jsMsg.userId)) == null)
+        if (RedisUtil.zAdd(RDS_NS_USERS, 1, Long.toUnsignedString(jsMsg.userId)) == null)
             return false;
         // ZSET senders
-        if (RedisUtil.zAdd(RDS_NS_SENDERS, jsMsg.senderId, Long.toUnsignedString(jsMsg.senderId)) == null)
+        if (RedisUtil.zAdd(RDS_NS_SENDERS, 1, Long.toUnsignedString(jsMsg.senderId)) == null)
             return false;
         
         return true;
@@ -234,8 +221,174 @@ public class ZAPIMsgHandler extends BaseApiHandler {
         
         return msgId;
     }
+    
+    private Long getOperateListMsgFieldByUser(Function func, long userId, Boolean state, long beginValue)
+    {
+        if (!validateLongValue(userId))
+            return null;
+        
+        Long msgCounter = getUserMsgCounter(userId);
+        if (msgCounter == null)
+            return null;
+                
+        for (long msgId = 1; msgId <= msgCounter; msgId++)
+        {
+            beginValue = func.excuteFunc(userId, msgId, state, beginValue);
+        }
+        
+        return beginValue;
+    }
+    
+    private Long getOperateListMsgFieldBySender(Function func, long senderId, Boolean state, long beginValue)
+    {
+        try
+        { 
+            if (!validateLongValue(senderId))
+                return null;
 
-    public Long getUserMsgCounter(long userId) {
+            Set<Long> listUser = getListUserBySenderID(senderId);
+            if (listUser == null || listUser.isEmpty())
+                return null;
+
+            Long listMsgSize;
+            String listMsgKey = null;
+            for (Long userId : listUser)
+            {
+                listMsgKey = getKeyListMsgOfSIdAndUId(userId, senderId);
+                if (listMsgKey == null)
+                    return null;
+
+                listMsgSize = RedisUtil.zCard(listMsgKey);
+                if (listMsgSize == null)
+                    return null;
+
+                long selectSize = 0, selectCount = 0;
+                List<Long> listMsg = null;
+                Boolean result;
+                while (selectCount < listMsgSize)
+                {
+                    selectSize = Math.min(SIZE_PER_GET, listMsgSize - selectCount);
+                    listMsg = RedisUtil.zRangeLongValue(listMsgKey, selectCount, selectCount + selectSize - 1);
+                    if (listMsg == null)
+                        return null;
+
+                    for (int i = 0; i < listMsg.size(); i++)
+                    {
+                        beginValue = func.excuteFunc(userId, listMsg.get(i), state, beginValue);
+                        if (beginValue == -1L)
+                            return null;
+                    }
+
+                    selectCount += selectSize;
+                }
+            }
+
+            return beginValue;
+        }
+        catch (Exception ex)
+        {
+            return null;
+        }
+    }
+    
+    private interface Function 
+    {
+        long excuteFunc(long userId, long msgId, Boolean state, long beginValue);
+    }
+    
+    private Function getTotalResultByState = new Function() {
+        /**
+         * 
+         * @param userId
+         * @param msgId
+         * @param state
+         * @param beginValue
+         * @return -1L if failed
+         */
+        @Override
+        public long excuteFunc(long userId, long msgId, Boolean state, long beginValue) {
+            if (state == null)
+                return -1L;
+            
+            Boolean result = getMsgResult(userId, msgId);
+            if(result == null)
+                return -1L;
+            if (result == state)
+                beginValue++;
+            
+            return beginValue;
+        }
+    };
+    
+    
+    private Function getStatisticalProcessedTime = new Function() {
+        /**
+        * 
+        * @param statePTime
+        * @param pTime
+        * @param state
+        *          null get sum processed time
+        *          true get min processed time
+        *          false get max processed time
+        * @return -1L if failed
+        */
+        @Override
+        public long excuteFunc(long userId, long msgId, Boolean state, long beginValue) {
+            Long pTime = getMsgProcessedTime(userId, msgId);
+            if (pTime == null)
+                return -1L;
+            
+            if (state == null)
+            {
+                beginValue += pTime;
+            }
+            else 
+            if (state)
+                beginValue = Math.min(beginValue, pTime);
+            else beginValue = Math.max(beginValue, pTime);
+
+            return beginValue;
+        }
+    };
+    
+    private Boolean getMsgResult(long userId, long msgId)
+    {
+        if (!validateLongValue(userId, msgId))
+            return null;
+        
+        String msgKey = getKeyMsgInfo(userId, msgId);
+        if (msgKey == null)
+            return null;
+
+        Long result = RedisUtil.hGetLongValue(msgKey, RDS_NS_MSG_INFO_FILED_RESULT);
+        if (result == null)
+            return null;
+        
+        return (result != 0);
+    }
+    
+    private Long getMsgProcessedTime(long userId, long msgId)
+    {
+        if (!validateLongValue(userId, msgId))
+            return null;
+        
+        String msgKey = getKeyMsgInfo(userId, msgId);
+        if (msgKey == null)
+            return null;
+
+        Long reqTime = RedisUtil.hGetLongValue(msgKey, RDS_NS_MSG_INFO_FIELD_REQUEST_TIME);
+        if (reqTime == null)
+            return null;
+        
+        Long sendTime = RedisUtil.hGetLongValue(msgKey, RDS_NS_MSG_INFO_FIELD_SEND_TIME);
+        if (sendTime == null)
+            return null;
+        
+        return (sendTime - reqTime);
+    }
+
+    public Long getUserMsgCounter(long userId) 
+    {
         if (!validateLongValue(userId))
             return null;
         
@@ -279,7 +432,7 @@ public class ZAPIMsgHandler extends BaseApiHandler {
                 return null;
 
             long selectSize = 0, selectCount = 0, totalReq = 0;
-            List<Long> listUser;
+            List<Long> listUser = null;
             while (selectCount < totalUser)
             {
                 selectSize = Math.min(SIZE_PER_GET, totalUser - selectCount);
@@ -306,23 +459,7 @@ public class ZAPIMsgHandler extends BaseApiHandler {
             return null;
         }
     }
-    
-    private Boolean getMsgResult(long userId, long msgId)
-    {
-        if (!validateLongValue(userId, msgId))
-            return null;
-        
-        String msgKey = getKeyMsgInfo(userId, msgId);
-        if (msgKey == null)
-            return null;
-
-        Long result = RedisUtil.hGetLongValue(msgKey, RDS_NS_MSG_INFO_FILED_RESULT);
-        if (result == null)
-            return null;
-        
-        return (result != 0);
-    }
-    
+     
     public Long getTotalMsgByUser(long userId)
     {
         if (!validateLongValue(userId))
@@ -336,22 +473,7 @@ public class ZAPIMsgHandler extends BaseApiHandler {
         if (!validateLongValue(userId))
             return null;
         
-        Long msgCounter = getUserMsgCounter(userId);
-        if (msgCounter == null)
-            return null;
-                
-        long totalSucceed = 0;
-        Boolean result;
-        for (long msgId = 1; msgId <= msgCounter; msgId++)
-        {
-            result = getMsgResult(userId, msgId);
-            if(result == null)
-                return null;
-            if (result)
-                totalSucceed++;
-        }
-        
-        return totalSucceed;
+        return getOperateListMsgFieldByUser(getTotalResultByState, userId, true, 0);
     }
     
     public Long getTotalFailedByUser(long userId)
@@ -359,22 +481,7 @@ public class ZAPIMsgHandler extends BaseApiHandler {
         if (!validateLongValue(userId))
             return null;
         
-        Long msgCounter = getUserMsgCounter(userId);
-        if (msgCounter == null)
-            return null;
-                
-        long totalFailed = 0;
-        Boolean result;
-        for (long msgId = 1; msgId <= msgCounter; msgId++)
-        {
-            result = getMsgResult(userId, msgId);
-            if (result == null)
-                return null;
-            if (!result)
-                totalFailed++;
-        }
-        
-        return totalFailed;
+        return getOperateListMsgFieldByUser(getTotalResultByState, userId, false, 0);
     }
     
     public Long getTotalMsgBySender(long senderId)
@@ -388,7 +495,7 @@ public class ZAPIMsgHandler extends BaseApiHandler {
         
         long totalMsg = 0;
         Long listMsgSize;
-        String listMsgKey;
+        String listMsgKey = null;
         for (Long userId : setUser)
         {
             listMsgKey = getKeyListMsgOfSIdAndUId(userId, senderId);
@@ -407,132 +514,18 @@ public class ZAPIMsgHandler extends BaseApiHandler {
     
     public Long getTotalSucceedBySender(long senderId)
     {
-        try
-        { 
-            if (!validateLongValue(senderId))
+        if (!validateLongValue(senderId))
                 return null;
-
-            Set<Long> listUser = getListUserBySenderID(senderId);
-            if (listUser == null || listUser.isEmpty())
-                return null;
-
-            long totalSucceed = 0;
-            Long listMsgSize;
-            String listMsgKey;
-            for (Long userId : listUser)
-            {
-                listMsgKey = getKeyListMsgOfSIdAndUId(userId, senderId);
-                if (listMsgKey == null)
-                    return null;
-
-                listMsgSize = RedisUtil.zCard(listMsgKey);
-                if (listMsgSize == null)
-                    return null;
-
-                long selectSize = 0, selectCount = 0;
-                List<Long> listMsg;
-                Boolean result;
-                while (selectCount < listMsgSize)
-                {
-                    selectSize = Math.min(SIZE_PER_GET, listMsgSize - selectCount);
-                    listMsg = RedisUtil.zRangeLongValue(listMsgKey, selectCount, selectCount + selectSize - 1);
-                    if (listMsg == null)
-                        return null;
-
-                    for (int i = 0; i < listMsg.size(); i++)
-                    {
-                        result = getMsgResult(userId, listMsg.get(i));
-                        if (result == null)
-                            return null;
-                        if (result)
-                            totalSucceed++;
-                    }
-
-                    selectCount += selectSize;
-                }
-            }
-
-            return totalSucceed;
-        }
-        catch (Exception ex)
-        {
-            return null;
-        }
+        
+        return getOperateListMsgFieldBySender(getTotalResultByState, senderId, Boolean.TRUE, 0);
     }
     
     public Long getTotalFailedBySender(long senderId)
     {
-        try
-        {
-            if (!validateLongValue(senderId))
+        if (!validateLongValue(senderId))
                 return null;
-
-            Set<Long> listUser = getListUserBySenderID(senderId);
-            if (listUser == null || listUser.isEmpty())
-                return null;
-
-            long totalFailed = 0;
-            Long listMsgSize;
-            String listMsgKey;
-            for (Long userId : listUser)
-            {
-                listMsgKey = getKeyListMsgOfSIdAndUId(userId, senderId);
-                if (listMsgKey == null)
-                    return null;
-
-                listMsgSize = RedisUtil.zCard(listMsgKey);
-                if (listMsgSize == null)
-                    return null;
-
-                long selectSize = 0, selectCount = 0;
-                List<Long> listMsg;
-                Boolean result;
-                while (selectCount < listMsgSize)
-                {
-                    selectSize = Math.min(SIZE_PER_GET, listMsgSize - selectCount);
-                    listMsg = RedisUtil.zRangeLongValue(listMsgKey, selectCount, selectCount + selectSize - 1);
-                    if (listMsg == null)
-                        return null;
-
-                    for (int i = 0; i < listMsg.size(); i++)
-                    {
-                        result = getMsgResult(userId, listMsg.get(i));
-                        if (result == null)
-                            return null;
-                        if (!result)
-                            totalFailed++;
-                    }
-
-                    selectCount += selectSize;
-                }
-            }
-
-            return totalFailed;
-        }
-        catch (Exception ex)
-        {
-            return null;
-        }
-    }
-    
-    private Long getMsgProcessedTime(long userId, long msgId)
-    {
-        if (!validateLongValue(userId, msgId))
-            return null;
         
-        String msgKey = getKeyMsgInfo(userId, msgId);
-        if (msgKey == null)
-            return null;
-
-        Long reqTime = RedisUtil.hGetLongValue(msgKey, RDS_NS_MSG_INFO_FIELD_REQUEST_TIME);
-        if (reqTime == null)
-            return null;
-        
-        Long sendTime = RedisUtil.hGetLongValue(msgKey, RDS_NS_MSG_INFO_FIELD_SEND_TIME);
-        if (sendTime == null)
-            return null;
-        
-        return (sendTime - reqTime);
+        return getOperateListMsgFieldBySender(getTotalResultByState, senderId, Boolean.FALSE, 0);
     }
     
     public Long getMinProcessedTimeByUser(long userId)
@@ -540,22 +533,7 @@ public class ZAPIMsgHandler extends BaseApiHandler {
         if (!validateLongValue(userId))
             return null;
         
-        Long msgCounter = getUserMsgCounter(userId);
-        if (msgCounter == null)
-            return null;
-                
-        long minPTime = Long.MAX_VALUE;
-        Long pTime;
-        for (long msgId = 1; msgId <= msgCounter; msgId++ )
-        {
-            pTime = getMsgProcessedTime(userId, msgId);
-            if (pTime == null)
-                return null;
-            
-            minPTime = Math.min(minPTime, pTime);
-        }
-        
-        return minPTime;
+        return getOperateListMsgFieldByUser(getStatisticalProcessedTime, userId, Boolean.TRUE, Long.MAX_VALUE);
     }
     
     public Long getMaxProcessedTimeByUser(long userId)
@@ -563,22 +541,7 @@ public class ZAPIMsgHandler extends BaseApiHandler {
         if (!validateLongValue(userId))
             return null;
         
-        Long msgCounter = getUserMsgCounter(userId);
-        if (msgCounter == null)
-            return null;
-                
-        long maxPTime = 0;
-        Long pTime;
-        for (long msgId = 1; msgId <= msgCounter; msgId++ )
-        {
-            pTime = getMsgProcessedTime(userId, msgId);
-            if (pTime == null)
-                return null;
-            
-            maxPTime = Math.max(maxPTime, pTime);
-        }
-        
-        return maxPTime;
+        return getOperateListMsgFieldByUser(getStatisticalProcessedTime, userId, Boolean.FALSE, 0);
     }
     
     public Double getAverageProcessedTimeByUser(long userId)
@@ -586,193 +549,33 @@ public class ZAPIMsgHandler extends BaseApiHandler {
         if (!validateLongValue(userId))
             return null;
         
-        Long msgCounter = getUserMsgCounter(userId);
-        if (msgCounter == null)
-            return null;
-                
-        long sumPTime = 0;
-        Long pTime;
-        for (long msgId = 1; msgId <= msgCounter; msgId++ )
-        {
-            pTime = getMsgProcessedTime(userId, msgId);
-            if (pTime == null)
-                return null;
-            
-            sumPTime += pTime;
-        }
-        
-        if (msgCounter == 0)
-            return null;
-        
-        return ((double) sumPTime / (double) msgCounter);
-    }    
-    
+        return ((double) getOperateListMsgFieldByUser(getStatisticalProcessedTime, userId, null, 0) 
+                / (double) getTotalMsgByUser(userId));
+    }   
+           
     public Long getMinProcessedTimeBySender(long senderId)
     {
-        try
-        {
-            if (!validateLongValue(senderId))
+        if (!validateLongValue(senderId))
                 return null;
-
-            Set<Long> listUser = getListUserBySenderID(senderId);
-            if (listUser == null || listUser.isEmpty())
-                return null;
-
-            long minPTime = Long.MAX_VALUE;
-            Long listMsgSize;
-            String listMsgKey;
-            for (Long userId : listUser)
-            {
-                listMsgKey = getKeyListMsgOfSIdAndUId(userId, senderId);
-                if (listMsgKey == null)
-                    return null;
-
-                listMsgSize = RedisUtil.zCard(listMsgKey);
-                if (listMsgSize == null)
-                    return null;
-
-                long selectSize = 0, selectCount = 0;
-                List<Long> listMsg;
-                Long pTime;
-                while (selectCount < listMsgSize)
-                {
-                    selectSize = Math.min(SIZE_PER_GET, listMsgSize - selectCount);
-                    listMsg = RedisUtil.zRangeLongValue(listMsgKey, selectCount, selectCount + selectSize - 1);
-                    if (listMsg == null)
-                        return null;
-
-                    for (int i = 0; i < listMsg.size(); i++)
-                    {
-                        pTime = getMsgProcessedTime(userId, listMsg.get(i));
-                        if (pTime == null)
-                            return null;
-                        minPTime = Math.min(minPTime, pTime);
-                    }
-
-                    selectCount += selectSize;
-                }
-            }
-
-            return minPTime;
-        }
-        catch (Exception ex)
-        {
-            return null;
-        }
+        
+        return getOperateListMsgFieldBySender(getStatisticalProcessedTime, senderId, Boolean.TRUE, Long.MAX_VALUE);
     }
     
     public Long getMaxProcessedTimeBySender(long senderId)
     {
-        try
-        {
-            if (!validateLongValue(senderId))
+        if (!validateLongValue(senderId))
                 return null;
-
-            Set<Long> listUser = getListUserBySenderID(senderId);
-            if (listUser == null || listUser.isEmpty())
-                return null;
-
-            long maxPTime = 0;
-            Long listMsgSize;
-            String listMsgKey;
-            for (Long userId : listUser)
-            {
-                listMsgKey = getKeyListMsgOfSIdAndUId(userId, senderId);
-                if (listMsgKey == null)
-                    return null;
-
-                listMsgSize = RedisUtil.zCard(listMsgKey);
-                if (listMsgSize == null)
-                    return null;
-
-                long selectSize = 0, selectCount = 0;
-                List<Long> listMsg;
-                Long pTime;
-                while (selectCount < listMsgSize)
-                {
-                    selectSize = Math.min(SIZE_PER_GET, listMsgSize - selectCount);
-                    listMsg = RedisUtil.zRangeLongValue(listMsgKey, selectCount, selectCount + selectSize - 1);
-                    if (listMsg == null)
-                        return null;
-
-                    for (int i = 0; i < listMsg.size(); i++)
-                    {
-                        pTime = getMsgProcessedTime(userId, listMsg.get(i));
-                        if (pTime == null)
-                            return null;
-                        maxPTime = Math.max(maxPTime, pTime);
-                    }
-
-                    selectCount += selectSize;
-                }
-            }
-
-            return maxPTime;
-        }
-        catch (Exception ex)
-        {
-            return null;
-        }
+        
+        return getOperateListMsgFieldBySender(getStatisticalProcessedTime, senderId, Boolean.FALSE, 0);
     }
-    
-    
-    
+        
     public Double getAverageProcessedTimeBySender(long senderId)
     {
-        try
-        {
-            if (!validateLongValue(senderId))
+        if (!validateLongValue(senderId))
                 return null;
-
-            Set<Long> listUser = getListUserBySenderID(senderId);
-            if (listUser == null || listUser.isEmpty())
-                return null;
-
-            long sumPTime = 0, totalMsg = 0;
-            Long listMsgSize;
-            String listMsgKey;
-            for (Long userId : listUser)
-            {
-                listMsgKey = getKeyListMsgOfSIdAndUId(userId, senderId);
-                if (listMsgKey == null)
-                    return null;
-
-                listMsgSize = RedisUtil.zCard(listMsgKey);
-                if (listMsgSize == null)
-                    return null;
-
-                long selectSize = 0, selectCount = 0;
-                List<Long> listMsg;
-                Long pTime;
-                while (selectCount < listMsgSize)
-                {
-                    selectSize = Math.min(SIZE_PER_GET, listMsgSize - selectCount);
-                    listMsg = RedisUtil.zRangeLongValue(listMsgKey, selectCount, selectCount + selectSize - 1);
-                    if (listMsg == null)
-                        return null;
-
-                    for (int i = 0; i < listMsg.size(); i++)
-                    {
-                        pTime = getMsgProcessedTime(userId, listMsg.get(i));
-                        if (pTime == null)
-                            return null;
-                        sumPTime += pTime;
-                        totalMsg++;
-                    }
-
-                    selectCount += selectSize;
-                }
-            }
-
-            if (totalMsg == 0)
-                return null;
-
-            return ((double) sumPTime / (double) totalMsg);
-        }
-        catch (Exception ex)
-        {
-            return null;
-        }
+        
+        return ( (double) getOperateListMsgFieldBySender(getStatisticalProcessedTime, senderId, null, 0)
+                / (double) getTotalMsgBySender(senderId));
     }
         
     public Set<Long> getListSenderByUserID(long userId)
