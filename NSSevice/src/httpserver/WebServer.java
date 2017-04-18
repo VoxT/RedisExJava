@@ -72,22 +72,22 @@ public class WebServer extends Thread {
         long startTime = System.nanoTime();
         System.out.println(ZAPIMsgHandler.getInstance().getTotalRequest());
         System.out.println("------------------------------------");
-        System.out.println(ZAPIMsgHandler.getInstance().getListSenderByUserID(5));
-        System.out.println(ZAPIMsgHandler.getInstance().getMaxProcessedTimeByUser(5));
-        System.out.println(ZAPIMsgHandler.getInstance().getMinProcessedTimeByUser(5));
-        System.out.println(ZAPIMsgHandler.getInstance().getAverageProcessedTimeByUser(5));        
-        System.out.println(ZAPIMsgHandler.getInstance().getTotalMsgByUser(5));
-        System.out.println(ZAPIMsgHandler.getInstance().getTotalSucceedByUser(5));
-        System.out.println(ZAPIMsgHandler.getInstance().getTotalFailedByUser(5));
+        System.out.println(ZAPIMsgHandler.getInstance().getListSenderByUserID(7));
+        System.out.println(ZAPIMsgHandler.getInstance().getMaxProcessedTimeByUser(7));
+        System.out.println(ZAPIMsgHandler.getInstance().getMinProcessedTimeByUser(7));
+        System.out.println(ZAPIMsgHandler.getInstance().getAverageProcessedTimeByUser(7));        
+        System.out.println(ZAPIMsgHandler.getInstance().getTotalMsgByUser(7));
+        System.out.println(ZAPIMsgHandler.getInstance().getTotalSucceedByUser(7));
+        System.out.println(ZAPIMsgHandler.getInstance().getTotalFailedByUser(7));
         
         System.out.println("------------------------------------");
-        System.out.println(ZAPIMsgHandler.getInstance().getListUserBySenderID(19));
-        System.out.println(ZAPIMsgHandler.getInstance().getMaxProcessedTimeBySender(19));
-        System.out.println(ZAPIMsgHandler.getInstance().getMinProcessedTimeBySender(19));
-        System.out.println(ZAPIMsgHandler.getInstance().getAverageProcessedTimeBySender(19));        
-        System.out.println(ZAPIMsgHandler.getInstance().getTotalMsgBySender(19));
-        System.out.println(ZAPIMsgHandler.getInstance().getTotalSucceedBySender(19));
-        System.out.println(ZAPIMsgHandler.getInstance().getTotalFailedBySender(19));
+        System.out.println(ZAPIMsgHandler.getInstance().getListUserBySenderID(12));
+        System.out.println(ZAPIMsgHandler.getInstance().getMaxProcessedTimeBySender(12));
+        System.out.println(ZAPIMsgHandler.getInstance().getMinProcessedTimeBySender(12));
+        System.out.println(ZAPIMsgHandler.getInstance().getAverageProcessedTimeBySender(12));        
+        System.out.println(ZAPIMsgHandler.getInstance().getTotalMsgBySender(12));
+        System.out.println(ZAPIMsgHandler.getInstance().getTotalSucceedBySender(12));
+        System.out.println(ZAPIMsgHandler.getInstance().getTotalFailedBySender(12));
         System.out.println("------------------------------------");
         long stopTime = System.nanoTime();
         
